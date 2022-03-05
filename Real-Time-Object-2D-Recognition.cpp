@@ -19,7 +19,12 @@ class Object {
 public:
     int area = 0;
     int label = 0;
-    Vec3b color = Vec3b(rand() % 256, rand() % 256, rand() % 256);
+    int x = 0;
+    int y = 0;
+    int height = 0;
+    int width = 0;
+    cv::Point centroid;
+    Vec3b color = Vec3b(0,0,0);
     vector<cv::Point> pixels;
 };
 
@@ -85,27 +90,23 @@ bool cmp(Object &a, Object &b) {
     return a.area > b.area;
 }
 
-void computeFeatures(Mat stats, Mat centroids, vector<Object> regions) {
+void computeFeatures(map<int, Object> regions) {
 
     vector<double> features;
 
-    for (Object region : regions) {
+    //for (Object region : regions) {
 
-    }
-
-
-
+    //}
 }
 
-Mat getConnectedComponents(const Mat &src, const Mat &target, Mat &stats, Mat &centroids, vector<Object> &regions, int N) {
+Mat getConnectedComponents(const Mat &src, const Mat &target, map<int, Object> &regions, int N) {
 
-        cv::Mat labels;
+        Mat labels, stats, centroids;
         Mat dst = Mat::zeros(target.rows, target.cols, CV_8UC3);
         int comps = connectedComponentsWithStats(src, labels, stats, centroids, 4);
 
         //cout << "Number of components: " << comps << endl;
         vector<Object> objects;
-        vector<Vec3b> colors(comps, Vec3b(0,0,0));
 
         for (int i = 1; i < comps; i++) {
 
@@ -123,16 +124,17 @@ Mat getConnectedComponents(const Mat &src, const Mat &target, Mat &stats, Mat &c
         int min = N < objects.size() ? N : objects.size();
 
         for (int i = 0; i < min; i++) {  
-            regions.push_back(objects[i]);
-            colors[objects[i].label] = objects[i].color;
+
+            objects[i].color = Vec3b(rand() % 256, rand() % 256, rand() % 256);
+            objects[i].x = stats.at<int>(objects[i].label, cv::CC_STAT_LEFT);
+            objects[i].y = stats.at<int>(objects[i].label, cv::CC_STAT_TOP);
+            objects[i].width = stats.at<int>(objects[i].label, cv::CC_STAT_WIDTH);
+            objects[i].height = stats.at<int>(objects[i].label, cv::CC_STAT_HEIGHT);
+            objects[i].centroid = Point(centroids.at<double>(objects[i].label, 0), centroids.at<double>(objects[i].label, 1));
+            regions[objects[i].label] = objects[i];
         }
 
         //for (int i = 0; i < min; i++) {
-        //    int x = stats.at<int>(objects[i].label, cv::CC_STAT_LEFT);
-        //    int y = stats.at<int>(objects[i].label, cv::CC_STAT_TOP);
-        //    int w = stats.at<int>(objects[i].label, cv::CC_STAT_WIDTH);
-        //    int h = stats.at<int>(objects[i].label, cv::CC_STAT_HEIGHT);
-        //    int area = stats.at<int>(objects[i].label, cv::CC_STAT_AREA);
 
         //    Scalar green(0, 255, 0);
         //    Scalar blue(255, 0, 0);
@@ -145,7 +147,8 @@ Mat getConnectedComponents(const Mat &src, const Mat &target, Mat &stats, Mat &c
             for (int j = 0; j < dst.cols; j++) {
 
                 int label = labels.at<int>(i, j);
-                dst.at<Vec3b>(i, j) = colors[label];
+                regions[label].pixels.push_back(Point(i, j));
+                dst.at<Vec3b>(i, j) = regions[label].color;
             }
         }
         return dst;
@@ -156,11 +159,11 @@ Mat pipeline(Mat &src, int N) {
     Mat thresh = getThreshold(src);
     Mat morphed = getMorphed(thresh);
     Mat stats, centroids;
-    vector<Object> objects;
-    Mat segmented = getConnectedComponents(morphed, src, stats, centroids, objects, N);
+    map<int, Object> objects;
+    Mat segmented = getConnectedComponents(morphed, src, objects, N);
     //imshow("CC", segmented);
     //waitKey(0);
-    computeFeatures(stats, centroids, objects);
+    //computeFeatures(objects);
 
     return segmented;
 
