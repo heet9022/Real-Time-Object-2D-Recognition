@@ -10,6 +10,10 @@
 #include <filesystem>
 #include<cmath>
 #include <map>
+#include <set>
+
+#include "csv_helper.h"
+#include "knn.h"
 
 using namespace cv;
 using namespace std;
@@ -90,13 +94,11 @@ bool cmp(Object &a, Object &b) {
     return a.area > b.area;
 }
 
-Mat computeFeatures(Mat &src, map<int, Object> regions) {
+vector<vector<double>> computeFeatures(Mat &src, map<int, Object> regions) {
 
     Mat dst = src.clone();
-
-    vector<double> features;
     vector<Moments> mu(regions.size());
-    vector<double[7]> arrayOfhuMoments(regions.size());
+    vector<vector<double>> arrayOfhuMoments(regions.size());
     map<string, int>::iterator it;
 
     int k = 0;
@@ -105,8 +107,18 @@ Mat computeFeatures(Mat &src, map<int, Object> regions) {
 
     for (auto const& region : regions)
     {
-        Rect rect(region.second.x, region.second.y, region.second.width, region.second.height);
-        cv::rectangle(dst, rect, green);
+        if (region.second.area == 0)
+            continue;
+
+        //RotatedRect box = minAreaRect(cv::Mat(region.second.pixels));
+        //cv::Point2f vertices[4];
+        //box.points(vertices);
+
+        //for (int j = 0; j < 4; ++j)
+        //    cv::line(dst, vertices[j], vertices[(j + 1) % 4], cv::Scalar(255, 0, 0), 1, 8);
+
+        //Rect rect(region.second.x, region.second.y, region.second.width, region.second.height);
+        //cv::rectangle(dst, rect, green);
         Moments moment = moments(region.second.pixels);
         mu.push_back(moment);
         HuMoments(moment, arrayOfhuMoments[k]);
@@ -122,28 +134,9 @@ Mat computeFeatures(Mat &src, map<int, Object> regions) {
             2);
         k++;
     }
+    imshow("Features", dst);
 
-    //for (int i = 0; i < min; i++) {
-
-        //    Scalar green(0, 255, 0);
-        //    Scalar blue(255, 0, 0);
-        //    Rect rect(x, y, w, h);
-        //    cv::circle(dst, Point(centroids.at<double>(objects[i].label, 0), centroids.at<double>(objects[i].label, 1)), 3, blue);
-        //    cv::rectangle(dst, rect, green);
-        //}
-
-
-    //vector<Point2f> mc(objects.size());
-    //for (size_t i = 0; i < objects.size(); i++)
-    //{
-    //    //add 1e-5 to avoid division by zero
-    //    mc[i] = Point2f(static_cast<float>(mu[i].m10 / (mu[i].m00 + 1e-5)),
-    //        static_cast<float>(mu[i].m01 / (mu[i].m00 + 1e-5)));
-    //    cout << "mc[" << i << "]=" << mc[i] << endl;
-    //}
-
-    return dst;
-
+    return arrayOfhuMoments;
 }
 
 Mat getConnectedComponents(const Mat &src, const Mat &target, map<int, Object> &regions, int N) {
@@ -192,20 +185,47 @@ Mat getConnectedComponents(const Mat &src, const Mat &target, map<int, Object> &
         return dst;
 }
 
-Mat pipeline(Mat &src, int N) {
+vector<vector<double>> pipeline(Mat &src, int N) {
 
     Mat thresh = getThreshold(src);
     Mat morphed = getMorphed(thresh);
     Mat stats, centroids;
     map<int, Object> objects;
     Mat segmented = getConnectedComponents(morphed, src, objects, N);
-    Mat features = computeFeatures(src, objects);
+    //imshow("Segmented", segmented);
+    vector<vector<double>>  features = computeFeatures(src, objects);
     //imshow("CC", segmented);
     //waitKey(0);
-
-
     return features;
 
+}
+
+double euclideanDistance(vector<double> f1, vector<double> f2) {
+
+    double sum = 0;
+    for (int i = 0; i < f1.size(); i++)
+        sum += pow(f1[i] - f2[i], 2);
+
+    return sqrt(sum);
+}
+
+string classify(const vector<vector<double>>  &features) {
+
+    string fileName = "training_feature_database.csv";
+    std::vector<std::string> labels;
+    std::vector<std::vector<double>> nfeatures;
+    readFromFile(fileName, labels, nfeatures);
+    double min_dist = std::numeric_limits<double>::infinity();
+    string min_label;
+    for (int i = 0; i < nfeatures.size(); i++) {
+        
+        double dist = euclideanDistance(nfeatures[i], features[0]);
+        if (dist < min_dist) {
+            min_dist = dist;
+            min_label = labels[i];
+        }
+    }
+    return min_label;
 }
 
 void video() {
@@ -214,11 +234,20 @@ void video() {
     capdev = new cv::VideoCapture(0);
     cv::namedWindow("Video", 1); // identifies a window
     cv::Mat frame;
+    vector<vector<double>>  features;
 
     for (;;) {
 
         *capdev >> frame; // get a new frame from the camera, treat as a stream
-        frame = pipeline(frame, 3);
+        features = pipeline(frame, 1);
+        string p_class = KNN(features, 5);
+        cv::putText(frame, //target image
+            p_class, //text
+            Point(100,100), //top-left position
+            cv::FONT_HERSHEY_DUPLEX,
+            1,
+            CV_RGB(118, 185, 0), //font color
+            2);
         imshow("Video", frame);
         char key = cv::waitKey(10);
         string name;
@@ -230,13 +259,60 @@ void video() {
 
             cout << "Name the image: ";
             getline(cin, name);
-            imwrite(name + ".jpg", frame);
+            imwrite("Results\\" + name + ".jpg", frame);
             cout << name << " saved!" << endl;
+        }
+
+        if (key == 't') {
+
+            cout << "Name the training image: ";
+            getline(cin, name);
+            imwrite("Train_images\\" + name + ".jpg", frame);
+            cout << name << " saved!" << endl;
+
+            String label;
+            cout << "Label the object: ";
+            getline(cin, label);
+
+            string fileName = "training_feature_database.csv";
+
+            if (writeToFile(fileName, label, features[0]))
+                cout << "a Successful write " << endl;
         }
     }
 
     delete capdev;
 
+}
+
+void evaluate() {
+
+    fs::path imgDir = fs::current_path();
+    imgDir /= "Test_images";
+    map<string, map<string, int>> d;
+    set<string> s;
+    float total = 0;
+   
+    for (const auto& entry : fs::directory_iterator(imgDir)) {
+
+        fs::path path = entry.path();
+        Mat image = imread(path.string(), IMREAD_COLOR);
+        vector<vector<double>>  features = pipeline(image, 1);
+        string pred_class = KNN(features, 5);
+        string fname = path.filename().string();
+        string real_label = fname.substr(0, fname.find("_"));
+        s.insert(real_label);
+        //cout << pred_class << ":" << real_label << endl;
+        d[pred_class][real_label] += 1;
+        total++;
+    }
+    float correct_preds = 0;
+    for (string label : s) {
+        correct_preds += d[label][label];
+    }
+    cout <<"accuracy: " << correct_preds / total * 100 << endl;
+    string fname = "confusion_matrix.csv";
+    //writeConfusionMatrix(fname, s, d);
 }
 
 int main() {
@@ -248,6 +324,7 @@ int main() {
     //waitKey(0);
 
     video();
+    //evaluate();
  
     return(0);
 

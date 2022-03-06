@@ -18,12 +18,18 @@
     <ClCompile Include="Real-Time-Object-2D-Recognition.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Features.cpp">
+    <ClCompile Include="csv_helper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="knn.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Features.h">
+    <ClInclude Include="csv_helper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="knn.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
