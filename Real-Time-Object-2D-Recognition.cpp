@@ -90,13 +90,60 @@ bool cmp(Object &a, Object &b) {
     return a.area > b.area;
 }
 
-void computeFeatures(map<int, Object> regions) {
+Mat computeFeatures(Mat &src, map<int, Object> regions) {
+
+    Mat dst = src.clone();
 
     vector<double> features;
+    vector<Moments> mu(regions.size());
+    vector<double[7]> arrayOfhuMoments(regions.size());
+    map<string, int>::iterator it;
 
-    //for (Object region : regions) {
+    int k = 0;
+    Scalar green(0, 255, 0);
+    Scalar blue(255, 0, 0);
 
+    for (auto const& region : regions)
+    {
+        Rect rect(region.second.x, region.second.y, region.second.width, region.second.height);
+        cv::rectangle(dst, rect, green);
+        Moments moment = moments(region.second.pixels);
+        mu.push_back(moment);
+        HuMoments(moment, arrayOfhuMoments[k]);
+        for (int j = 0; j < 7; j++) {
+            arrayOfhuMoments[k][j] = -1 * copysign(1.0, arrayOfhuMoments[k][j]) * log10(abs(arrayOfhuMoments[k][j]));
+        }
+        cv::putText(dst, //target image
+            to_string(arrayOfhuMoments[k][1]), //text
+            region.second.centroid, //top-left position
+            cv::FONT_HERSHEY_DUPLEX,
+            0.5,
+            CV_RGB(118, 185, 0), //font color
+            2);
+        k++;
+    }
+
+    //for (int i = 0; i < min; i++) {
+
+        //    Scalar green(0, 255, 0);
+        //    Scalar blue(255, 0, 0);
+        //    Rect rect(x, y, w, h);
+        //    cv::circle(dst, Point(centroids.at<double>(objects[i].label, 0), centroids.at<double>(objects[i].label, 1)), 3, blue);
+        //    cv::rectangle(dst, rect, green);
+        //}
+
+
+    //vector<Point2f> mc(objects.size());
+    //for (size_t i = 0; i < objects.size(); i++)
+    //{
+    //    //add 1e-5 to avoid division by zero
+    //    mc[i] = Point2f(static_cast<float>(mu[i].m10 / (mu[i].m00 + 1e-5)),
+    //        static_cast<float>(mu[i].m01 / (mu[i].m00 + 1e-5)));
+    //    cout << "mc[" << i << "]=" << mc[i] << endl;
     //}
+
+    return dst;
+
 }
 
 Mat getConnectedComponents(const Mat &src, const Mat &target, map<int, Object> &regions, int N) {
@@ -134,15 +181,6 @@ Mat getConnectedComponents(const Mat &src, const Mat &target, map<int, Object> &
             regions[objects[i].label] = objects[i];
         }
 
-        //for (int i = 0; i < min; i++) {
-
-        //    Scalar green(0, 255, 0);
-        //    Scalar blue(255, 0, 0);
-        //    Rect rect(x, y, w, h);
-        //    cv::circle(dst, Point(centroids.at<double>(objects[i].label, 0), centroids.at<double>(objects[i].label, 1)), 3, blue);
-        //    cv::rectangle(dst, rect, green);
-        //}
-
         for (int i = 0; i < dst.rows; i++) {
             for (int j = 0; j < dst.cols; j++) {
 
@@ -161,11 +199,12 @@ Mat pipeline(Mat &src, int N) {
     Mat stats, centroids;
     map<int, Object> objects;
     Mat segmented = getConnectedComponents(morphed, src, objects, N);
+    Mat features = computeFeatures(src, objects);
     //imshow("CC", segmented);
     //waitKey(0);
-    //computeFeatures(objects);
 
-    return segmented;
+
+    return features;
 
 }
 
