@@ -98,6 +98,7 @@ vector<vector<double>> computeFeatures(Mat &src, map<int, Object> regions) {
 
     Mat dst = src.clone();
     vector<Moments> mu(regions.size());
+    vector<Point2f> mc(regions.size());
     vector<vector<double>> arrayOfhuMoments(regions.size());
     map<string, int>::iterator it;
 
@@ -110,17 +111,76 @@ vector<vector<double>> computeFeatures(Mat &src, map<int, Object> regions) {
         if (region.second.area == 0)
             continue;
 
-        //RotatedRect box = minAreaRect(cv::Mat(region.second.pixels));
-        //cv::Point2f vertices[4];
-        //box.points(vertices);
+        vector<Point2f> pix_;
+        for (Point p : region.second.pixels) {
+            pix_.push_back(Point2f(p.y, p.x));
+        }
 
-        //for (int j = 0; j < 4; ++j)
-        //    cv::line(dst, vertices[j], vertices[(j + 1) % 4], cv::Scalar(255, 0, 0), 1, 8);
+        RotatedRect box = minAreaRect(cv::Mat(pix_));
+        cv::Point2f vertices[4];
+        box.points(vertices);
+        //cv::Point2f vertices_[4];
+        //for (Point2f v : vertices) {
+        //    vertices_->x = vertices->y;
+        //    vertices_->y = vertices->x;
+        //}
+
+        for (int j = 0; j < 4; ++j)
+            cv::line(dst, vertices[j], vertices[(j + 1) % 4], cv::Scalar(255, 0, 0), 1, 8);
+
+        Point p1, p2, p3, p4, k1, k2;
+        p1 = (vertices[0] + vertices[1]) / 2;
+        p2 = (vertices[2] + vertices[3]) / 2;
+
+        p3 = (vertices[1] + vertices[2]) / 2;
+        p4 = (vertices[3] + vertices[0]) / 2;
+
+        double d1 = cv::norm(p1 - p2);
+        double d2 = cv::norm(p3 - p4);
+
+        if (d1 > d2) {
+            k1 = p1;
+            k2 = p2;
+        }
+        else {
+            k1 = p3;
+            k2 = p4;
+        }
 
         //Rect rect(region.second.x, region.second.y, region.second.width, region.second.height);
         //cv::rectangle(dst, rect, green);
-        Moments moment = moments(region.second.pixels);
+        Moments moment = moments(pix_);
         mu.push_back(moment);
+        //mc.push_back(Point2f(static_cast<float>(moment.m10 / (moment.m00 + 1e-5)), static_cast<float>(moment.m01 / (moment.m00 + 1e-5))));
+        //double alpha = 0.5 * atan2(2 * moment.mu11, moment.mu20 - moment.mu02);
+        //alpha = (alpha / 3.142) * 180;
+        
+        //Point rot_projection = Point();
+        //float min_x = std::numeric_limits<float>::infinity();
+        //float max_x = -std::numeric_limits<float>::infinity();
+        //float min_y = std::numeric_limits<float>::infinity();
+        //float max_y = -std::numeric_limits<float>::infinity();
+        //for (Point coord : region.second.pixels) {
+
+        //    float y_proj = (float) ((coord.x - (moment.m10 / moment.m00)) * cos(alpha) + (coord.y - (moment.m01 / moment.m00)) * sin(alpha));
+        //    float x_proj = (float) ((coord.x - (moment.m10 / moment.m00)) * ( - sin(alpha)) + (coord.y - (moment.m01 / moment.m00)) * cos(alpha));
+
+        //    min_x = min_x < x_proj ? min_x : x_proj;
+        //    max_x = max_x > x_proj ? max_x : x_proj;
+
+        //    min_y = min_y < y_proj ? min_y : y_proj;
+        //    max_y = max_y > y_proj ? max_y : y_proj;
+        //}
+        //Point2f cen = Point(moment.m10 / moment.m00, moment.m01 / moment.m00);
+        line(dst, k1, k2, Scalar(0,255,0), 2);
+
+        //RotatedRect box(Point2f(dst.rows-1-max_y, max_x), Point2f(dst.rows - 1 - min_y, max_x), Point2f(dst.rows - 1 - min_y, min_x));
+        //Point2f vertices[4];
+        //box.points(vertices);
+        //for (int i = 0; i < 4; i++)
+        //    line(dst, vertices[i], vertices[(i + 1) % 4], Scalar(0, 255, 0), 2);
+
+
         HuMoments(moment, arrayOfhuMoments[k]);
         for (int j = 0; j < 7; j++) {
             arrayOfhuMoments[k][j] = -1 * copysign(1.0, arrayOfhuMoments[k][j]) * log10(abs(arrayOfhuMoments[k][j]));
@@ -215,6 +275,7 @@ string classify(const vector<vector<double>>  &features) {
     std::vector<std::string> labels;
     std::vector<std::vector<double>> nfeatures;
     readFromFile(fileName, labels, nfeatures);
+
     double min_dist = std::numeric_limits<double>::infinity();
     string min_label;
     for (int i = 0; i < nfeatures.size(); i++) {
@@ -235,12 +296,19 @@ void video() {
     cv::namedWindow("Video", 1); // identifies a window
     cv::Mat frame;
     vector<vector<double>>  features;
+    string p_class;
+
+    bool record = false;
+    bool playing = false;
+    VideoWriter oVideoWriter;
 
     for (;;) {
 
+        p_class = "No objects Detected";
         *capdev >> frame; // get a new frame from the camera, treat as a stream
         features = pipeline(frame, 1);
-        string p_class = KNN(features, 5);
+        if (features[0].size() != 0)
+             p_class = KNN(features, 5);
         cv::putText(frame, //target image
             p_class, //text
             Point(100,100), //top-left position
@@ -248,6 +316,24 @@ void video() {
             1,
             CV_RGB(118, 185, 0), //font color
             2);
+
+        if (record) {
+            int frames_per_second;
+            Size frame_size;
+            if (!playing) {
+                frames_per_second = 5;
+                frame_size = frame.size();
+                oVideoWriter.open("ObjectDetection.avi", VideoWriter::fourcc('M', 'J', 'P', 'G'), frames_per_second, frame_size, true);
+                playing = true;
+                cout << "Recording started" << endl;
+            }
+            if (playing)
+
+                oVideoWriter.write(frame);
+        }
+        else
+            oVideoWriter.release();
+
         imshow("Video", frame);
         char key = cv::waitKey(10);
         string name;
@@ -279,6 +365,13 @@ void video() {
             if (writeToFile(fileName, label, features[0]))
                 cout << "a Successful write " << endl;
         }
+
+        if (key == 'r') {
+
+            record = !record;
+            playing = false;
+
+        }
     }
 
     delete capdev;
@@ -297,8 +390,10 @@ void evaluate() {
 
         fs::path path = entry.path();
         Mat image = imread(path.string(), IMREAD_COLOR);
+
         vector<vector<double>>  features = pipeline(image, 1);
         string pred_class = KNN(features, 5);
+
         string fname = path.filename().string();
         string real_label = fname.substr(0, fname.find("_"));
         s.insert(real_label);

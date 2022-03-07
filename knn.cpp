@@ -11,9 +11,13 @@ public:
 	}
 };
 
-//double euclideanDistance(Company& lhs, Company& test) {
-	//return sqrt(pow((lhs.turnover - test.turnover), 2) + pow((lhs.characteristics - test.characteristics), 2));
-//}
+double euclideanDistance(vector<double>& f1, vector<double>& f2) {
+
+	double sum = 0;
+	for (int i = 0; i < f1.size(); i++)
+		sum += pow((f1[i] - f2[i]), 2);
+	return sqrt(sum);
+}
 
 bool cmp(Data& a, Data& b) {
 	return a.distance < b.distance;
@@ -23,9 +27,9 @@ double manhattanDistance(vector<double>& f1, vector<double>& f2) {
 
 	double sum = 0;
 
-	for (int i = 0; i < f1.size(); i++) {
+	for (int i = 0; i < f1.size(); i++) 
 		sum += abs(f1[i] - f2[i]);
-	}
+
 	return sum;
 }
 
@@ -35,7 +39,7 @@ void fillDistances(vector<vector<double>> &query, vector<vector<double>> &nfeatu
 		Data data_point;
 		data_point.label = labels[i];
 		data_point.features = nfeatures[i];
-		data_point.distance = manhattanDistance(data_point.features, query[0]);
+		data_point.distance = euclideanDistance(data_point.features, query[0]);
 		data.push_back(data_point);
 	}
 }
@@ -55,6 +59,9 @@ string KNN(vector<vector<double>>& query, int k) {
 	//sorting so that we can get the k nearest
 	sort(data.begin(), data.end(), cmp);
 
+	if (data[0].distance > 10)
+		return "unknown";
+
 	map<string, int> count;
 	int max = -1;
 	string mode_label;
@@ -65,6 +72,7 @@ string KNN(vector<vector<double>>& query, int k) {
 			max = count[data[i].label];
 			mode_label = data[i].label;
 		}
+		//cout << "label: " << data[i].label << " distance: " << data[i].distance << endl;
 	}
 
 	return mode_label;
