@@ -1,5 +1,12 @@
 #include "csv_helper.h"
 
+/*
+* Appends a row to CSV
+* std::string file_name: File name of the csv file
+* std::string label: Label for the features
+* std::vector<double> features: Features to be appended
+*/
+
 bool writeToFile(std::string file_name, std::string label, std::vector<double> features) {
 
 	std::ofstream file;
@@ -13,6 +20,13 @@ bool writeToFile(std::string file_name, std::string label, std::vector<double> f
 
 	return true;
 }
+
+/*
+* Writes a confusion matrix to csv
+* std::string file_name: File name of the csv file
+* set<string> &s: Set of labels
+*  map<string, map<string, int>> &cm: Consfusion matrix
+*/
 
 bool writeConfusionMatrix(string file_name, set<string> &s, map<string, map<string, int>> &cm) {
 
@@ -37,6 +51,14 @@ bool writeConfusionMatrix(string file_name, set<string> &s, map<string, map<stri
 	return true;
 
 }
+
+/*
+* Read from a CSV file
+* std::string file_name: File name of the csv file
+* std::vector<std::string> &labels: Number of labels
+* std::vector<std::vector<double>> &nfeatures: Trained features
+*/
+
 
 bool readFromFile(std::string file_name, std::vector<std::string> &labels, std::vector<std::vector<double>> &nfeatures) {
 

@@ -19,6 +19,18 @@ using namespace cv;
 using namespace std;
 namespace fs = std::filesystem;
 
+/*
+* This class is used to store instances of a region. It has the following attributes:
+* int area: area of the region
+* int label: label of the region
+* int x: coordinate for top left pixel of the region
+* int height: height of the region
+* int width: width of the region
+* Point centroid: centroid of the region
+* vec3b color: color of the region
+* vector<Point> pixels: All the pixels of the region
+*/
+
 class Object {
 public:
     int area = 0;
@@ -32,6 +44,13 @@ public:
     vector<cv::Point> pixels;
 };
 
+/*
+* converts filename to image
+* 
+* string image: filename of the image
+* returns Mat image
+*/
+
 Mat getImage(string image) {
 
     fs::path target_path = fs::current_path();
@@ -39,6 +58,12 @@ Mat getImage(string image) {
     Mat target = imread(target_path.string(), IMREAD_COLOR);
     return target;
 }
+
+/*
+* Computes a thresholded binary image
+* Mat src: source image
+* returns binary image
+*/
 
 Mat getThreshold(const Mat &src) {
 
@@ -60,6 +85,13 @@ Mat getThreshold(const Mat &src) {
     return thresh;
 }
 
+/*
+* Computes erosion operation
+* Mat src: source image
+* returns eroded image
+*/
+
+
 Mat getEroded(const Mat &src) {
 
     int erosion_type = MORPH_RECT;
@@ -69,6 +101,12 @@ Mat getEroded(const Mat &src) {
     erode(src, eroded, element);
     return eroded;
 }
+
+/*
+* Computes dilation operation
+* Mat src: source image
+* returns dilated image
+*/
 
 Mat getDilated(const Mat &src) {
 
@@ -82,6 +120,12 @@ Mat getDilated(const Mat &src) {
     return dilated;
 }
 
+/*
+* Computes morphological operation
+* Mat src: source image
+* returns morphed image
+*/
+
 Mat getMorphed(const Mat& src) {
 
     Mat dilated = getDilated(src);
@@ -90,9 +134,20 @@ Mat getMorphed(const Mat& src) {
     return eroded;
 }
 
+/*
+* Comparison function for sorting Objects
+*/
+
 bool cmp(Object &a, Object &b) {
     return a.area > b.area;
 }
+
+/*
+* Computes Hu moments features 
+* Mat src: source image
+* map<int, Object> regions: Hashmap of label->Region 
+* returns features
+*/
 
 vector<vector<double>> computeFeatures(Mat &src, map<int, Object> regions) {
 
@@ -119,11 +174,6 @@ vector<vector<double>> computeFeatures(Mat &src, map<int, Object> regions) {
         RotatedRect box = minAreaRect(cv::Mat(pix_));
         cv::Point2f vertices[4];
         box.points(vertices);
-        //cv::Point2f vertices_[4];
-        //for (Point2f v : vertices) {
-        //    vertices_->x = vertices->y;
-        //    vertices_->y = vertices->x;
-        //}
 
         for (int j = 0; j < 4; ++j)
             cv::line(dst, vertices[j], vertices[(j + 1) % 4], cv::Scalar(255, 0, 0), 1, 8);
@@ -147,39 +197,10 @@ vector<vector<double>> computeFeatures(Mat &src, map<int, Object> regions) {
             k2 = p4;
         }
 
-        //Rect rect(region.second.x, region.second.y, region.second.width, region.second.height);
-        //cv::rectangle(dst, rect, green);
         Moments moment = moments(pix_);
         mu.push_back(moment);
-        //mc.push_back(Point2f(static_cast<float>(moment.m10 / (moment.m00 + 1e-5)), static_cast<float>(moment.m01 / (moment.m00 + 1e-5))));
-        //double alpha = 0.5 * atan2(2 * moment.mu11, moment.mu20 - moment.mu02);
-        //alpha = (alpha / 3.142) * 180;
-        
-        //Point rot_projection = Point();
-        //float min_x = std::numeric_limits<float>::infinity();
-        //float max_x = -std::numeric_limits<float>::infinity();
-        //float min_y = std::numeric_limits<float>::infinity();
-        //float max_y = -std::numeric_limits<float>::infinity();
-        //for (Point coord : region.second.pixels) {
 
-        //    float y_proj = (float) ((coord.x - (moment.m10 / moment.m00)) * cos(alpha) + (coord.y - (moment.m01 / moment.m00)) * sin(alpha));
-        //    float x_proj = (float) ((coord.x - (moment.m10 / moment.m00)) * ( - sin(alpha)) + (coord.y - (moment.m01 / moment.m00)) * cos(alpha));
-
-        //    min_x = min_x < x_proj ? min_x : x_proj;
-        //    max_x = max_x > x_proj ? max_x : x_proj;
-
-        //    min_y = min_y < y_proj ? min_y : y_proj;
-        //    max_y = max_y > y_proj ? max_y : y_proj;
-        //}
-        //Point2f cen = Point(moment.m10 / moment.m00, moment.m01 / moment.m00);
         line(dst, k1, k2, Scalar(0,255,0), 2);
-
-        //RotatedRect box(Point2f(dst.rows-1-max_y, max_x), Point2f(dst.rows - 1 - min_y, max_x), Point2f(dst.rows - 1 - min_y, min_x));
-        //Point2f vertices[4];
-        //box.points(vertices);
-        //for (int i = 0; i < 4; i++)
-        //    line(dst, vertices[i], vertices[(i + 1) % 4], Scalar(0, 255, 0), 2);
-
 
         HuMoments(moment, arrayOfhuMoments[k]);
         for (int j = 0; j < 7; j++) {
@@ -198,6 +219,15 @@ vector<vector<double>> computeFeatures(Mat &src, map<int, Object> regions) {
 
     return arrayOfhuMoments;
 }
+
+/*
+* Computes number of Connected Components
+* Mat src: source image
+* Mat target: Image on which the segmented images are superimposed
+* map<int, Object> regions: Hashmap of label->Region
+* int N: Number of connected components required
+* returns features
+*/
 
 Mat getConnectedComponents(const Mat &src, const Mat &target, map<int, Object> &regions, int N) {
 
@@ -245,6 +275,12 @@ Mat getConnectedComponents(const Mat &src, const Mat &target, map<int, Object> &
         return dst;
 }
 
+/*
+* Pipeline for the entire processing to compute features
+* Mat src: source image
+* returns features
+*/
+
 vector<vector<double>> pipeline(Mat &src, int N) {
 
     Mat thresh = getThreshold(src);
@@ -259,7 +295,12 @@ vector<vector<double>> pipeline(Mat &src, int N) {
     return features;
 
 }
-
+/*
+* Computes euclidean distance
+* vector<double> f1: feature vector 1
+* vector<double> f2: feature vector 2
+* returns distance
+*/
 double euclideanDistance(vector<double> f1, vector<double> f2) {
 
     double sum = 0;
@@ -269,6 +310,12 @@ double euclideanDistance(vector<double> f1, vector<double> f2) {
     return sqrt(sum);
 }
 
+
+/*
+* Simple classifier using euclidean distance
+* vector<vector<double>>  &features: Number of features read from csv
+* returns predicted label
+*/
 string classify(const vector<vector<double>>  &features) {
 
     string fileName = "training_feature_database.csv";
@@ -288,6 +335,10 @@ string classify(const vector<vector<double>>  &features) {
     }
     return min_label;
 }
+
+/*
+* Processes the entire object detection in video mode
+*/
 
 void video() {
 
@@ -378,6 +429,10 @@ void video() {
 
 }
 
+/*
+* Evaulated the classification model
+*/
+
 void evaluate() {
 
     fs::path imgDir = fs::current_path();
@@ -410,13 +465,11 @@ void evaluate() {
     //writeConfusionMatrix(fname, s, d);
 }
 
-int main() {
+/*
+* Driver code for the program
+*/
 
-    //Mat target = getImage("sample_1.jpg");
-    //Mat processed = pipeline(target, 3);
-    //imshow("Original", target);
-    //imshow("Processed", processed);
-    //waitKey(0);
+int main() {
 
     video();
     //evaluate();
